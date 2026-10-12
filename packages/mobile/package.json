@@ -1,0 +1,25 @@
+{
+  "name": "@opencode/mobile",
+  "version": "2.0.26",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/anomalyco/opencode",
+    "directory": "packages/mobile"
+  },
+  "scripts": {
+    "tauri": "tauri",
+    "webui": "node scripts/build-webui.mjs",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "portable": "node scripts/build-portable.mjs",
+    "android:init": "tauri android init",
+    "android:dev": "tauri android dev",
+    "android:build": "tauri android build"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}
