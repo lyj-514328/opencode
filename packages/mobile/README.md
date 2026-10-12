@@ -74,6 +74,13 @@ bun run --cwd packages/mobile android:build   # build APK/AAB
 
 Requires `ANDROID_HOME`/`ANDROID_SDK_ROOT` set and the NDK installed.
 
+## Remote access (phone off-LAN)
+
+How to expose the server so a phone on cellular or another network can reach it — plain HTTP,
+self-signed HTTPS through Caddy (no domain needed), real certificates, and the Android
+network-security-config that makes release builds work — is documented in
+[`docs/remote-access.md`](docs/remote-access.md) (written in Chinese).
+
 ## CI builds (GitHub Actions)
 
 `.github/workflows/mobile.yml` builds both packages on every push to the `mobile-shell` branch and
@@ -96,6 +103,7 @@ Release.
 packages/mobile/
   scripts/build-webui.mjs     # builds ../app (packages/app), copies dist -> webui/
   scripts/build-portable.mjs  # release build -> portable/ folder + zip (portable script)
+  docs/remote-access.md       # server deployment / HTTPS plan (Chinese)
   webui/                      # bundled OpenCode web UI (generated, gitignored)
   portable/                   # portable Windows package (generated, gitignored)
   src-tauri/                  # Rust crate + Tauri config + icons
