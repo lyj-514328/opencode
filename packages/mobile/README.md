@@ -74,6 +74,22 @@ bun run --cwd packages/mobile android:build   # build APK/AAB
 
 Requires `ANDROID_HOME`/`ANDROID_SDK_ROOT` set and the NDK installed.
 
+## CI builds (GitHub Actions)
+
+`.github/workflows/mobile.yml` builds both packages on every push to the `mobile-shell` branch and
+on tags matching `mobile-v*`. It can also be started by hand from the **Actions** tab
+(*mobile* → *Run workflow*).
+
+- **windows (portable exe)** → artifact `opencode-mobile-windows` (the portable `.zip`)
+- **android (apk)** → artifact `opencode-mobile-android` (debug-signed, arm64, installable)
+
+Grab them from the **Artifacts** section of a run. Pushing a `mobile-v*` tag (e.g. `git tag
+mobile-v0.1.0 && git push origin mobile-v0.1.0`) additionally attaches both files to a GitHub
+Release.
+
+> This workflow uses GitHub-hosted runners on purpose. The other workflows in this repository target
+> Blacksmith runners, which only exist on the upstream organization.
+
 ## Layout
 
 ```

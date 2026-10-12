@@ -1,0 +1,136 @@
+# Builds the Tauri shell in `packages/mobile` for Windows and Android.
+#
+# This fork-only workflow intentionally uses GitHub-hosted runners. The other workflows in this
+# repository target Blacksmith (`blacksmith-*`), which is not available on a personal fork.
+#
+# Windows: a single self-contained `.exe` in a portable `.zip` (no installer).
+# Android: a debug-signed, installable `.apk` for arm64 phones. A debug build needs no signing
+# secrets; switch to a release build with a keystore when you want an optimized APK.
+name: mobile
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - mobile-shell
+    tags:
+      - "mobile-v*"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  windows:
+    name: windows (portable exe)
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: ./.github/actions/setup-bun
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: packages/mobile/src-tauri
+
+      # Runs `tauri build --no-bundle`, which first builds the web UI (beforeBuildCommand) and then
+      # embeds it, then collects the exe + README into portable/ and zips it.
+      - name: Build portable package
+        working-directory: packages/mobile
+        run: bun run portable
+
+      - name: Upload Windows package
+        uses: actions/upload-artifact@v4
+        with:
+          name: opencode-mobile-windows
+          path: packages/mobile/portable/*.zip
+          if-no-files-found: error
+
+  android:
+    name: android (apk)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: ./.github/actions/setup-bun
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: packages/mobile/src-tauri
+
+      # Generates src-tauri/gen/android (kept out of git; regenerated on every run).
+      - name: Init Android project
+        working-directory: packages/mobile
+        run: bun run tauri -- android init --ci
+
+      # Read the NDK version the generated Gradle project expects instead of guessing one.
+      - name: Install Android NDK
+        run: |
+          set -euo pipefail
+          GRADLE=packages/mobile/src-tauri/gen/android/app/build.gradle.kts
+          NDK_VERSION=$(grep -oP 'ndkVersion\s*=\s*"\K[^"]+' "$GRADLE" | head -n1 || true)
+          NDK_VERSION=${NDK_VERSION:-27.0.12077973}
+          echo "Installing NDK $NDK_VERSION"
+          sdkmanager --install "ndk;$NDK_VERSION"
+          echo "NDK_HOME=${ANDROID_HOME}/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_HOME=${ANDROID_HOME}/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
+
+      - name: Build APK
+        working-directory: packages/mobile
+        run: bun run tauri -- android build --apk --debug --target aarch64 --ci
+
+      - name: Upload Android package
+        uses: actions/upload-artifact@v4
+        with:
+          name: opencode-mobile-android
+          path: packages/mobile/src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+          if-no-files-found: error
+
+  release:
+    name: release
+    if: startsWith(github.ref, 'refs/tags/mobile-v')
+    needs:
+      - windows
+      - android
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download packages
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**
+          generate_release_notes: true
