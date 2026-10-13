@@ -14,6 +14,14 @@ webui
 portable
 *.local
 
+# Tauri-generated Android project (recreated by `tauri android init`)
+src-tauri/gen/android
+
+# Android signing material — never commit
+keystore.properties
+*.jks
+*.keystore
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

@@ -4,8 +4,8 @@
 # repository target Blacksmith (`blacksmith-*`), which is not available on a personal fork.
 #
 # Windows: a single self-contained `.exe` in a portable `.zip` (no installer).
-# Android: a debug-signed, installable `.apk` for arm64 phones. A debug build needs no signing
-# secrets; switch to a release build with a keystore when you want an optimized APK.
+# Android: a release-signed, installable `.apk` for arm64 phones. Signing uses the
+# ANDROID_KEYSTORE_BASE64 / ANDROID_KEYSTORE_PASSWORD / ANDROID_KEY_ALIAS repository secrets.
 name: mobile
 
 on:
@@ -110,9 +110,20 @@ jobs:
           echo "NDK_HOME=$SDK/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
           echo "ANDROID_NDK_HOME=$SDK/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
 
+      # `tauri android init` recreates src-tauri/gen/android, so the release signing config from the
+      # Tauri docs cannot be committed. This writes keystore.properties from the secrets and patches
+      # app/build.gradle.kts to sign the release build type.
+      - name: Configure release signing
+        working-directory: packages/mobile
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: node scripts/setup-android-signing.mjs
+
       - name: Build APK
         working-directory: packages/mobile
-        run: bun run tauri -- android build --apk --debug --target aarch64 --ci
+        run: bun run tauri -- android build --apk --target aarch64 --ci
 
       - name: Upload Android package
         uses: actions/upload-artifact@v4

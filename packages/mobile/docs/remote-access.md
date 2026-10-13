@@ -53,7 +53,7 @@
 | **WebView 遵守 NSC**（明文策略 + 信任锚都会作用于 App 内 WebView） | Android `NetworkSecurityPolicy` 文档 / OWASP MASTG-KNOW-0015 |
 | 一旦配置了 NSC，manifest 的 `usesCleartextTraffic` 属性**让位于 NSC** | Android 官方文档 |
 
-### 为什么 debug APK 能用、release 不能
+### Android 的明文策略（debug 与 release）
 
 Tauri 移动模板（原文）：
 
@@ -75,10 +75,11 @@ android {
 
 manifest 里：`android:usesCleartextTraffic="${usesCleartextTraffic}"`。
 
-所以 **debug 包能连 `http://IP:4096`，release 包不能** —— 这是默认策略，不是漏洞；App 作者可以 opt-in。
+所以**默认**只有 debug 包能连 `http://IP:4096`，release 包不能 —— 这是 Android 的策略，不是漏洞；App 作者可以 opt-in。
 
-> 当前 CI 出的是 **debug** APK，所以**现在就能走 HTTP**。只有在改用签名 release 包
-> （签名 / 体积 / 混淆）时才会撞上这个限制。
+> **本 fork 的 CI 已经处理了这点**：`scripts/setup-android-signing.mjs` 在打签名补丁时会同时把
+> `release` 的 `usesCleartextTraffic` 设成 `"true"`，所以 CI 出的**签名 release APK 同样能走 HTTP**。
+> 下面 §3.3 的手工改法只在你自建 release 包、或想收窄成"只放行某台服务器"时才需要。
 
 ---
 
@@ -118,7 +119,7 @@ App 连接页两种方式二选一：
   ```
   > 必须用 `--url`：云服务器的公网 IP 通常是 NAT 映射，网卡上只有私网 IP，自动生成的链接里会是内网地址，手机打不开。
 
-### 3.3 release 包放行明文（两选一）
+### 3.3 手工给 release 包放行明文（可选；CI 已自动放行）
 
 **写法一：全局放行**（最省事）
 
@@ -395,8 +396,8 @@ opencode pair --remote --yes          # 输出 https://xxxx.<隧道域名>/auth/
 
 - [ ] 选定方案（建议：先试 D，不行走 B）
 - [ ] 提交 `packages/mobile/android/{network_security_config.xml,opencode_ca.crt}`
-- [ ] 新增 `packages/mobile/scripts/patch-android.mjs`，接进 `android:build` / `android:dev` 与 CI
-- [ ] （可选）CI 从 debug APK 切到签名 release APK：keystore 放 GitHub Secrets
+- [x] 新增 `packages/mobile/scripts/setup-android-signing.mjs`（写 `keystore.properties` + 补丁 `build.gradle.kts`），已在 CI 的 android job 中调用
+- [x] CI 从 debug APK 切到签名 release APK：keystore 放 GitHub Secrets（`ANDROID_KEYSTORE_BASE64` / `ANDROID_KEYSTORE_PASSWORD` / `ANDROID_KEY_ALIAS`）
 - [ ] （可选）把 Caddy + 证书生成的命令写成 `deploy/` 下的脚本
 
 ---

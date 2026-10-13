@@ -63,7 +63,7 @@ bun run --cwd packages/mobile portable
 `README.txt`) into `portable/`, then zips it. The result is a single self-contained `.exe`: no
 installer, nothing installed, nothing written next to it — move it anywhere and double-click.
 
-## Android (next step)
+## Android
 
 ```bash
 rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
@@ -73,6 +73,40 @@ bun run --cwd packages/mobile android:build   # build APK/AAB
 ```
 
 Requires `ANDROID_HOME`/`ANDROID_SDK_ROOT` set and the NDK installed.
+
+### Android release signing
+
+Both CI and local release builds are signed with your own (self-signed) keystore, so the APK installs
+and updates like a normal app. The keystore is never committed; CI reads it from these repository
+secrets:
+
+| Secret | Meaning |
+| --- | --- |
+| `ANDROID_KEYSTORE_BASE64` | base64 of the `.jks` file |
+| `ANDROID_KEYSTORE_PASSWORD` | keystore / key password |
+| `ANDROID_KEY_ALIAS` | key alias inside the keystore |
+
+Generate the keystore and set the secrets once:
+
+```bash
+keytool -genkeypair -v -keystore opencode-mobile-release.jks -storetype JKS \
+  -keyalg RSA -keysize 2048 -validity 10000 -alias upload \
+  -dname "CN=OpenCode Mobile, O=<you>, C=CN"
+
+base64 -w0 opencode-mobile-release.jks > keystore.b64   # macOS: base64 -i ...
+gh secret set ANDROID_KEYSTORE_BASE64    < keystore.b64
+gh secret set ANDROID_KEYSTORE_PASSWORD  -b '<store password>'
+gh secret set ANDROID_KEY_ALIAS          -b upload
+```
+
+> Back the keystore up. Losing it means you can never update the installed app under the same
+> identity; leaking it means someone else can sign updates as you.
+
+Because `tauri android init` recreates `src-tauri/gen/android` on every run, the signing config is
+applied by `scripts/setup-android-signing.mjs` (`bun run --cwd packages/mobile android:sign`)
+instead of being committed. The script also sets `usesCleartextTraffic=true` for release, so the
+release APK can still reach a plain HTTP server. For local signed builds, set
+`ANDROID_KEYSTORE_PATH`, `ANDROID_KEYSTORE_PASSWORD`, and `ANDROID_KEY_ALIAS`, then run `android:sign`.
 
 ## Remote access (phone off-LAN)
 
@@ -88,7 +122,7 @@ on tags matching `mobile-v*`. It can also be started by hand from the **Actions*
 (*mobile* → *Run workflow*).
 
 - **windows (portable exe)** → artifact `opencode-mobile-windows` (the portable `.zip`)
-- **android (apk)** → artifact `opencode-mobile-android` (debug-signed, arm64, installable)
+- **android (apk)** → artifact `opencode-mobile-android` (release-signed, arm64, installable)
 
 Grab them from the **Artifacts** section of a run. Pushing a `mobile-v*` tag (e.g. `git tag
 mobile-v0.1.0 && git push origin mobile-v0.1.0`) additionally attaches both files to a GitHub
@@ -103,6 +137,7 @@ Release.
 packages/mobile/
   scripts/build-webui.mjs     # builds ../app (packages/app), copies dist -> webui/
   scripts/build-portable.mjs  # release build -> portable/ folder + zip (portable script)
+  scripts/setup-android-signing.mjs  # keystore.properties + release signing patch for gen/android
   docs/remote-access.md       # server deployment / HTTPS plan (Chinese)
   webui/                      # bundled OpenCode web UI (generated, gitignored)
   portable/                   # portable Windows package (generated, gitignored)

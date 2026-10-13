@@ -16,6 +16,7 @@
     "build": "tauri build",
     "portable": "node scripts/build-portable.mjs",
     "android:init": "tauri android init",
+    "android:sign": "node scripts/setup-android-signing.mjs",
     "android:dev": "tauri android dev",
     "android:build": "tauri android build"
   },
